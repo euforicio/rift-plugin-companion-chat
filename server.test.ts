@@ -24,9 +24,11 @@ const request = {
 function host({
   environmentId = "environment-1",
   companionDeletedAt = null,
+  companionVisibility = "hidden",
 }: {
   environmentId?: string | null;
   companionDeletedAt?: number | null;
+  companionVisibility?: "visible" | "hidden";
 } = {}) {
   const source = makeThreadResponse({
     id: "source-1",
@@ -39,7 +41,7 @@ function host({
     projectId: "project-1",
     environmentId: "environment-1",
     providerId: "pi",
-    visibility: "visible",
+    visibility: companionVisibility,
     deletedAt: companionDeletedAt,
   });
   return createFakePluginHost({
@@ -49,6 +51,7 @@ function host({
         get: async ({ threadId }) =>
           threadId === source.id ? source : companion,
         spawn: async () => companion,
+        update: async () => companion,
       },
     },
   });
@@ -71,7 +74,7 @@ describe("Companion Chat backend", () => {
     });
   });
 
-  it("creates one visible fresh thread and remembers it for the panel", async () => {
+  it("creates one hidden fresh thread and remembers it for the panel", async () => {
     const { bb, harness } = host();
     await plugin(bb);
 
@@ -91,7 +94,7 @@ describe("Companion Chat backend", () => {
       [
         {
           ...request,
-          visibility: "visible",
+          visibility: "hidden",
           origin: "plugin",
           originPluginId: "companion-chat",
         },
@@ -103,6 +106,26 @@ describe("Companion Chat backend", () => {
         instanceId: "instance-1",
       }),
     ).resolves.toMatchObject({ companionThreadId: "companion-1" });
+  });
+
+  it("hides a previously visible companion when its panel restores", async () => {
+    const { bb, harness } = host({ companionVisibility: "visible" });
+    await bb.storage.kv.set("companion:instance-1", {
+      sourceThreadId: "source-1",
+      companionThreadId: "companion-1",
+    });
+    await plugin(bb);
+
+    await expect(
+      harness.behavior.callRpc("getCompanion", {
+        sourceThreadId: "source-1",
+        instanceId: "instance-1",
+      }),
+    ).resolves.toMatchObject({ companionThreadId: "companion-1" });
+
+    expect(harness.inspection.sdk.callsTo("threads.update")).toEqual([
+      [{ threadId: "companion-1", visibility: "hidden" }],
+    ]);
   });
 
   it("refuses to open before the source thread has a ready environment", async () => {

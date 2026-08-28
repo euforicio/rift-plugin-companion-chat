@@ -174,6 +174,11 @@ export default async function plugin(bb: BbPluginApi) {
         if (companion.deletedAt !== null) {
           await bb.storage.kv.delete(recordKey(instanceId));
           record = null;
+        } else if (companion.visibility !== "hidden") {
+          await bb.sdk.threads.update({
+            threadId: companion.id,
+            visibility: "hidden",
+          });
         }
       }
       return {
@@ -194,7 +199,7 @@ export default async function plugin(bb: BbPluginApi) {
         await bb.sdk.threads.get({ threadId: sourceThreadId });
         const thread = await bb.sdk.threads.spawn({
           ...(request as NewThreadRequest),
-          visibility: "visible",
+          visibility: "hidden",
         });
         await bb.storage.kv.set(recordKey(instanceId), {
           sourceThreadId,
