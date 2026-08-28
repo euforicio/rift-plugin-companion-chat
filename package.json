@@ -1,0 +1,55 @@
+{
+  "name": "bb-plugin-companion-chat",
+  "version": "0.1.0",
+  "description": "Start a fresh provider-selectable chat beside the current bb thread.",
+  "license": "MIT",
+  "author": {
+    "name": "Divyesh",
+    "url": "https://github.com/divyesh-puri"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/divyesh-puri/bb-plugin-companion-chat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/divyesh-puri/bb-plugin-companion-chat/issues"
+  },
+  "homepage": "https://github.com/divyesh-puri/bb-plugin-companion-chat#readme",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Companion Chat",
+    "description": "Start a fresh provider-selectable chat beside the current thread.",
+    "branding": {
+      "icon": "SideChat"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.4.8",
+    "@testing-library/react": "^16.3.3",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.0.0",
+    "cron-parser": "^5.10.0",
+    "hono": "^4.11.9",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
+  }
+}
