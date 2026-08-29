@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-companion-chat",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Start a fresh provider-selectable chat beside the current bb thread.",
   "license": "MIT",
   "author": {

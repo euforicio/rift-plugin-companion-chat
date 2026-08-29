@@ -144,6 +144,101 @@ function recordKey(instanceId: string) {
   return `companion:${instanceId}`;
 }
 
+const permissionModeRank = {
+  "accept-edits": 0,
+  auto: 1,
+  full: 2,
+} as const;
+
+function providerRouting(request: NewThreadRequest) {
+  if (request.environment.type === "reuse") {
+    return { environmentId: request.environment.environmentId };
+  }
+  if (request.environment.type === "host" && request.environment.hostId !== undefined) {
+    return { hostId: request.environment.hostId };
+  }
+  return {};
+}
+
+async function normalizeExecutionOptions(
+  bb: BbPluginApi,
+  request: NewThreadRequest,
+): Promise<NewThreadRequest> {
+  const routing = providerRouting(request);
+  const providers = await bb.sdk.providers.list(routing);
+  const provider = providers.find(({ id }) => id === request.providerId);
+  if (provider === undefined || !provider.available) {
+    throw new Error(`Provider "${request.providerId}" is not available.`);
+  }
+
+  const catalog = await bb.sdk.providers.models({
+    ...routing,
+    providerId: request.providerId,
+  });
+  const requestedModel = catalog.models.find(
+    ({ id, model }) => id === request.model || model === request.model,
+  );
+  if (
+    requestedModel === undefined &&
+    request.executionInputSources.model === "explicit"
+  ) {
+    throw new Error(
+      `Model "${request.model}" is not available for provider "${request.providerId}".`,
+    );
+  }
+  const model =
+    requestedModel ??
+    catalog.models.find(({ isDefault }) => isDefault) ??
+    catalog.models[0];
+  if (model === undefined) {
+    throw new Error(`Provider "${request.providerId}" has no available models.`);
+  }
+
+  const supportsReasoningLevel = model.supportedReasoningEfforts.some(
+    ({ reasoningEffort }) => reasoningEffort === request.reasoningLevel,
+  );
+  if (
+    !supportsReasoningLevel &&
+    request.executionInputSources.reasoningLevel === "explicit"
+  ) {
+    throw new Error(
+      `Model "${model.model}" does not support reasoning level "${request.reasoningLevel}".`,
+    );
+  }
+  if (
+    !provider.capabilities.permissionModes.includes(request.permissionMode) ||
+    permissionModeRank[request.permissionMode] >
+      permissionModeRank[catalog.permissionCeiling]
+  ) {
+    throw new Error(
+      `Provider "${request.providerId}" cannot use permission mode "${request.permissionMode}" in this environment.`,
+    );
+  }
+
+  const { serviceTier: _serviceTierSource, ...executionInputSources } =
+    request.executionInputSources;
+  if (requestedModel === undefined) {
+    executionInputSources.model = "client-preference";
+  }
+  if (!supportsReasoningLevel) {
+    executionInputSources.reasoningLevel = "client-preference";
+  }
+  const normalized = {
+    ...request,
+    model: model.model,
+    reasoningLevel: supportsReasoningLevel
+      ? request.reasoningLevel
+      : model.defaultReasoningEffort,
+    executionInputSources: provider.capabilities.supportsServiceTier
+      ? request.executionInputSources
+      : executionInputSources,
+  };
+
+  if (provider.capabilities.supportsServiceTier) return normalized;
+  const { serviceTier: _serviceTier, ...withoutServiceTier } = normalized;
+  return withoutServiceTier;
+}
+
 export default async function plugin(bb: BbPluginApi) {
   const pendingCreates = new Map<string, Promise<{ threadId: string }>>();
 
@@ -174,11 +269,6 @@ export default async function plugin(bb: BbPluginApi) {
         if (companion.deletedAt !== null) {
           await bb.storage.kv.delete(recordKey(instanceId));
           record = null;
-        } else if (companion.visibility !== "hidden") {
-          await bb.sdk.threads.update({
-            threadId: companion.id,
-            visibility: "hidden",
-          });
         }
       }
       return {
@@ -197,8 +287,12 @@ export default async function plugin(bb: BbPluginApi) {
 
       const create = (async () => {
         await bb.sdk.threads.get({ threadId: sourceThreadId });
+        const normalizedRequest = await normalizeExecutionOptions(
+          bb,
+          request as NewThreadRequest,
+        );
         const thread = await bb.sdk.threads.spawn({
-          ...(request as NewThreadRequest),
+          ...normalizedRequest,
           visibility: "hidden",
         });
         await bb.storage.kv.set(recordKey(instanceId), {
