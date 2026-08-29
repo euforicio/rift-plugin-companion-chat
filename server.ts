@@ -173,7 +173,7 @@ async function normalizeExecutionOptions(
 
   const catalog = await bb.sdk.providers.models({
     ...routing,
-    providerId: request.providerId,
+    providerId: provider.id,
   });
   const requestedModel = catalog.models.find(
     ({ id, model }) => id === request.model || model === request.model,
@@ -191,7 +191,7 @@ async function normalizeExecutionOptions(
     catalog.models.find(({ isDefault }) => isDefault) ??
     catalog.models[0];
   if (model === undefined) {
-    throw new Error(`Provider "${request.providerId}" has no available models.`);
+    throw new Error(`Provider "${provider.id}" has no available models.`);
   }
 
   const supportsReasoningLevel = model.supportedReasoningEfforts.some(
@@ -211,32 +211,42 @@ async function normalizeExecutionOptions(
       permissionModeRank[catalog.permissionCeiling]
   ) {
     throw new Error(
-      `Provider "${request.providerId}" cannot use permission mode "${request.permissionMode}" in this environment.`,
+      `Provider "${provider.id}" cannot use permission mode "${request.permissionMode}" in this environment.`,
     );
   }
 
-  const { serviceTier: _serviceTierSource, ...executionInputSources } =
-    request.executionInputSources;
+  const executionInputSources = { ...request.executionInputSources };
+  if (executionInputSources.providerId === undefined) {
+    // BB ignores a provided field when executionInputSources contains no
+    // source for it. The composer can omit this source after switching away
+    // from the main thread's provider, which otherwise restores that provider.
+    executionInputSources.providerId =
+      request.executionInputSources.model ?? "explicit";
+  }
   if (requestedModel === undefined) {
     executionInputSources.model = "client-preference";
   }
   if (!supportsReasoningLevel) {
     executionInputSources.reasoningLevel = "client-preference";
   }
-  const normalized = {
+  if (!provider.capabilities.supportsServiceTier) {
+    // Omitting this field lets BB reuse a stored project preference such as
+    // "fast". Explicitly select the neutral tier so non-tier providers start
+    // with the host-supported "default" value instead.
+    executionInputSources.serviceTier = "client-preference";
+  }
+  return {
     ...request,
+    providerId: provider.id,
     model: model.model,
     reasoningLevel: supportsReasoningLevel
       ? request.reasoningLevel
       : model.defaultReasoningEffort,
-    executionInputSources: provider.capabilities.supportsServiceTier
-      ? request.executionInputSources
-      : executionInputSources,
+    serviceTier: provider.capabilities.supportsServiceTier
+      ? request.serviceTier
+      : "default",
+    executionInputSources,
   };
-
-  if (provider.capabilities.supportsServiceTier) return normalized;
-  const { serviceTier: _serviceTier, ...withoutServiceTier } = normalized;
-  return withoutServiceTier;
 }
 
 export default async function plugin(bb: BbPluginApi) {

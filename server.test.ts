@@ -26,11 +26,13 @@ function host({
   companionDeletedAt = null,
   companionVisibility = "hidden",
   permissionCeiling = "full",
+  supportsServiceTier = false,
 }: {
   environmentId?: string | null;
   companionDeletedAt?: number | null;
   companionVisibility?: "visible" | "hidden";
   permissionCeiling?: "accept-edits" | "auto" | "full";
+  supportsServiceTier?: boolean;
 } = {}) {
   const source = makeThreadResponse({
     id: "source-1",
@@ -66,30 +68,61 @@ function host({
               permissionModes: ["full"],
               supportsFork: true,
               supportsNativeUserQuestion: false,
-              supportsServiceTier: false,
+              supportsServiceTier,
               supportsSessionRewind: true,
               supportsThreadArchive: false,
               supportsThreadRename: false,
             },
             composerActions: [{ kind: "skills", trigger: "/" }],
           },
-        ],
-        models: async () => ({
-          modelLoadError: null,
-          models: [
-            {
-              id: "anthropic/claude-opus-4-8",
-              model: "anthropic/claude-opus-4-8",
-              displayName: "Claude Opus 4.8",
-              description: "Anthropic model via Pi",
-              supportedReasoningEfforts: [
-                { reasoningEffort: "medium", description: "Medium" },
-                { reasoningEffort: "high", description: "High" },
-              ],
-              defaultReasoningEffort: "medium",
-              isDefault: true,
+          {
+            id: "acp-cursor",
+            displayName: "Cursor",
+            available: true,
+            logoUrl: null,
+            capabilities: {
+              permissionModes: ["accept-edits", "full"],
+              supportsFork: true,
+              supportsNativeUserQuestion: false,
+              supportsServiceTier: true,
+              supportsSessionRewind: false,
+              supportsThreadArchive: false,
+              supportsThreadRename: false,
             },
-          ],
+            composerActions: [{ kind: "skills", trigger: "/" }],
+          },
+        ],
+        models: async ({ providerId }) => ({
+          modelLoadError: null,
+          models:
+            providerId === "acp-cursor"
+              ? [
+                  {
+                    id: "cursor-grok-4.6-medium",
+                    model: "cursor-grok-4.6-medium",
+                    displayName: "Grok 4.6 Medium",
+                    description: "Grok via Cursor",
+                    supportedReasoningEfforts: [
+                      { reasoningEffort: "high", description: "High" },
+                    ],
+                    defaultReasoningEffort: "high",
+                    isDefault: true,
+                  },
+                ]
+              : [
+                  {
+                    id: "anthropic/claude-opus-4-8",
+                    model: "anthropic/claude-opus-4-8",
+                    displayName: "Claude Opus 4.8",
+                    description: "Anthropic model via Pi",
+                    supportedReasoningEfforts: [
+                      { reasoningEffort: "medium", description: "Medium" },
+                      { reasoningEffort: "high", description: "High" },
+                    ],
+                    defaultReasoningEffort: "medium",
+                    isDefault: true,
+                  },
+                ],
           permissionCeiling,
           providers: [],
           selectedOnlyModels: [],
@@ -116,7 +149,7 @@ describe("Companion Chat backend", () => {
     });
   });
 
-  it("normalizes stale execution options to the selected provider's capabilities", async () => {
+  it("preserves the selected provider when the composer omits its input source", async () => {
     const { bb, harness } = host();
     await plugin(bb);
 
@@ -125,14 +158,15 @@ describe("Companion Chat backend", () => {
       instanceId: "instance-1",
       request: {
         ...request,
+        providerId: "acp-cursor",
         model: "cursor-grok-4.6-medium",
-        reasoningLevel: "ultra",
+        reasoningLevel: "high",
         serviceTier: "fast",
         executionInputSources: {
-          ...request.executionInputSources,
-          model: "client-preference",
-          reasoningLevel: "client-preference",
-          serviceTier: "client-preference",
+          model: "explicit",
+          reasoningLevel: "explicit",
+          permissionMode: "explicit",
+          serviceTier: "explicit",
         },
       },
     });
@@ -141,12 +175,16 @@ describe("Companion Chat backend", () => {
       [
         {
           ...request,
-          model: "anthropic/claude-opus-4-8",
-          reasoningLevel: "medium",
+          providerId: "acp-cursor",
+          model: "cursor-grok-4.6-medium",
+          reasoningLevel: "high",
+          serviceTier: "fast",
           executionInputSources: {
-            ...request.executionInputSources,
-            model: "client-preference",
-            reasoningLevel: "client-preference",
+            model: "explicit",
+            providerId: "explicit",
+            reasoningLevel: "explicit",
+            permissionMode: "explicit",
+            serviceTier: "explicit",
           },
           visibility: "hidden",
           origin: "plugin",
@@ -154,6 +192,29 @@ describe("Companion Chat backend", () => {
         },
       ],
     ]);
+  });
+
+  it("preserves fast service tier for providers that support it", async () => {
+    const { bb, harness } = host({ supportsServiceTier: true });
+    await plugin(bb);
+
+    await harness.behavior.callRpc("createCompanion", {
+      sourceThreadId: "source-1",
+      instanceId: "instance-1",
+      request: {
+        ...request,
+        serviceTier: "fast",
+        executionInputSources: {
+          ...request.executionInputSources,
+          serviceTier: "explicit",
+        },
+      },
+    });
+
+    expect(harness.inspection.sdk.callsTo("threads.spawn")[0]?.[0]).toMatchObject({
+      serviceTier: "fast",
+      executionInputSources: { serviceTier: "explicit" },
+    });
   });
 
   it("rejects an unavailable model that the user selected explicitly", async () => {
@@ -164,7 +225,7 @@ describe("Companion Chat backend", () => {
       harness.behavior.callRpc("createCompanion", {
         sourceThreadId: "source-1",
         instanceId: "instance-1",
-        request: { ...request, model: "cursor-grok-4.6-medium" },
+        request: { ...request, model: "missing-model" },
       }),
     ).rejects.toThrow("not available");
 
@@ -221,6 +282,11 @@ describe("Companion Chat backend", () => {
       [
         {
           ...request,
+          serviceTier: "default",
+          executionInputSources: {
+            ...request.executionInputSources,
+            serviceTier: "client-preference",
+          },
           visibility: "hidden",
           origin: "plugin",
           originPluginId: "companion-chat",
