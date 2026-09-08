@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createFakePluginHost,
   makeThreadResponse,
-} from "@get-bb/plugin-sdk/testing";
+} from "@riftlabs/plugin-sdk/testing";
 import plugin from "./server";
 
 const request = {
@@ -48,7 +48,7 @@ function host({
     visibility: companionVisibility,
     deletedAt: companionDeletedAt,
   });
-  return createFakePluginHost({
+  const fake = createFakePluginHost({
     pluginId: "companion-chat",
     sdk: {
       threads: {
@@ -130,6 +130,7 @@ function host({
       },
     },
   });
+  return { bb: fake.rift, harness: fake.harness };
 }
 
 describe("Companion Chat backend", () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { loadPluginApp } from "@get-bb/plugin-sdk/testing/app";
+import { loadPluginApp } from "@riftlabs/plugin-sdk/testing/app";
 
 describe("Companion Chat panel action", () => {
   it("opens a distinct panel instance for each new companion", async () => {

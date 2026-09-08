@@ -1,8 +1,8 @@
 import {
   defineRpcContract,
-  type BbPluginApi,
+  type RiftPluginApi,
   type NewThreadRequest,
-} from "@get-bb/plugin-sdk";
+} from "@riftlabs/plugin-sdk";
 import { z } from "zod";
 
 const instanceIdSchema = z.string().min(1).max(100);
@@ -161,7 +161,7 @@ function providerRouting(request: NewThreadRequest) {
 }
 
 async function normalizeExecutionOptions(
-  bb: BbPluginApi,
+  bb: RiftPluginApi,
   request: NewThreadRequest,
 ): Promise<NewThreadRequest> {
   const routing = providerRouting(request);
@@ -249,7 +249,7 @@ async function normalizeExecutionOptions(
   };
 }
 
-export default async function plugin(bb: BbPluginApi) {
+export default async function plugin(bb: RiftPluginApi) {
   const pendingCreates = new Map<string, Promise<{ threadId: string }>>();
 
   async function readRecord(instanceId: string) {

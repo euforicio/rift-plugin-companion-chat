@@ -1,5 +1,7 @@
 {
-  "name": "bb-plugin-companion-chat",
+  "name": "rift-plugin-companion-chat",
+  "homepage": "https://riftlabs.app",
+  "author": "Rift Labs",
   "version": "0.1.3",
   "description": "Start a fresh provider-selectable chat beside the current bb thread.",
   "license": "MIT",
@@ -9,18 +11,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/divyesh-puri/bb-plugin-companion-chat.git"
+    "url": "https://github.com/euforicio/rift-plugin-companion-chat.git"
   },
   "bugs": {
     "url": "https://github.com/divyesh-puri/bb-plugin-companion-chat/issues"
   },
-  "homepage": "https://github.com/divyesh-puri/bb-plugin-companion-chat#readme",
+  "homepage": "https://riftlabs.app",
   "type": "module",
   "engines": {
-    "bb": ">=0.39",
-    "bbPluginSdk": ">=0.4.8"
+    "rift": ">=0.1.0",
+    "riftPluginSdk": ">=0.4.48"
   },
-  "bb": {
+  "rift": {
     "name": "Companion Chat",
     "description": "Start a fresh provider-selectable chat beside the current thread.",
     "branding": {
@@ -37,7 +39,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.4.8",
+    "@riftlabs/plugin-sdk": "0.4.48",
     "@testing-library/react": "^16.3.3",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
