@@ -19,7 +19,7 @@
   "homepage": "https://riftlabs.app",
   "type": "module",
   "engines": {
-    "rift": ">=0.1.0",
+    "rift": ">=0.39",
     "riftPluginSdk": ">=0.4.48"
   },
   "rift": {
